@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <switch.h>
+#include <switch/services/hid.h>
 
 #include "graphics.h"
 #include "font.h"
@@ -20,6 +21,7 @@ float Lerp(float a, float b, float t)		{ return a + t * (b - a); }
 float CosLerp(float a, float b, float t)	{ return Lerp(a, b, (-cos(3.14f*t) / 2.0f) + 0.5f); }
 
 int main(int argc, char* argv[]) {
+	Result start_seven_six_axis_sensor_result, initialize_seven_six_axis_sensor_result;
 	if (!initEgl(nwindowGetDefault())) {
 		return EXIT_FAILURE;
 	}
@@ -29,9 +31,8 @@ int main(int argc, char* argv[]) {
 	gladLoadGL();
 	initShaders();
 	
-	Font Text("romfs:/fonts/BerlinSans.ttf");
+	Font Text("romfs:/fonts/Inconsolata-SemiCondensedSemiBold.ttf");
 	Text.SetColor(0.0f, 0.0f, 0.0f);
-	
 	Sprite Cursor, Segments[44];
 	Cursor.Init(SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 4, 4, "romfs:/shapes/cursor.png");
 	
@@ -43,13 +44,17 @@ int main(int argc, char* argv[]) {
 	}
 	
 	// For motion input
-	u32 handles[3];
-	hidGetSixAxisSensorHandles(&handles[0], 2, CONTROLLER_PLAYER_1, TYPE_JOYCON_PAIR);
-	hidGetSixAxisSensorHandles(&handles[2], 1, CONTROLLER_PLAYER_1, TYPE_PROCONTROLLER);
-	hidStartSixAxisSensor(handles[0]);
+
+	
+	/*HidSixAxisSensorHandle handles[3];
+	hidGetSixAxisSensorHandles(&handles[0], 2, HidNpadIdType_No1, HidNpadStyleTag_NpadJoyDual);
+	hidGetSixAxisSensorHandles(&handles[2], 1, HidNpadIdType_No1 , HidNpadStyleTag_NpadFullKey);
+	
 	hidStartSixAxisSensor(handles[1]);
 	hidStartSixAxisSensor(handles[2]);
-	
+	*/	
+	start_seven_six_axis_sensor_result = hidStartSevenSixAxisSensor();
+	initialize_seven_six_axis_sensor_result = hidInitializeSevenSixAxisSensor();
 	// User Variables
 	int MotionSensitivity = 150;
 	int OrcaMoveSpeed = 400;
@@ -59,7 +64,7 @@ int main(int argc, char* argv[]) {
 	
 	bool textHidden = false;
 	bool isBehind = false;
-	
+	bool fullController = false;
 	varTable variableTable[] = {
 		{ "Motion Sensitivity: %i", &MotionSensitivity },
 		{ "Whale Move Speed: %i", &OrcaMoveSpeed },
@@ -71,13 +76,19 @@ int main(int argc, char* argv[]) {
 		{ "Background Color G: %i", &BGColG },
 		{ "Background Color B: %i", &BGColB },
 	};
-	
+	Result resultlol;
+	u32 bruteforcelol = 0;
+			do {
+				bruteforcelol+=0x800000;
+				resultlol = hidSetSevenSixAxisSensorFusionStrength(*reinterpret_cast<float*>(&bruteforcelol));
+			} while(!resultlol && bruteforcelol != 0);
 	int varSelection = 0;
-	
 	while (appletMainLoop()) {
-		hidScanInput();
-		u32 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-		u32 kHeld = hidKeysHeld(CONTROLLER_P1_AUTO);
+		u32 padType = hidGetNpadDeviceType(HidNpadIdType_No1);
+		fullController = (padType & HidNpadStyleSet_NpadFullCtrl);
+		/*
+		u32 kDown = hidKeysDown(HidNpadIdType_No1);
+		u32 kHeld = hidKeysHeld(HidNpadIdType_No1);
 		if (kDown & KEY_PLUS) {
 			break;
 		}
@@ -129,17 +140,19 @@ int main(int argc, char* argv[]) {
 		touchPosition touch;
 		
 		SixAxisSensorValues sixaxis;
-		hidSixAxisSensorValuesRead(&sixaxis, CONTROLLER_P1_AUTO, 1);
-		
+		hidSixAxisSensorValuesRead(&sixaxis, HidNpadIdType_No1, 1);		
 		if(hidTouchCount() > 0) {
 			hidTouchRead(&touch, 0);
 			
 			Cursor.posX = touch.px;
 			Cursor.posY = touch.py;
 		}
-		
-		Cursor.posX -= sixaxis.gyroscope.z * MotionSensitivity;
-		Cursor.posY -= sixaxis.gyroscope.x * MotionSensitivity;
+		*/
+		HidSevenSixAxisSensorState sevenaxisstate;
+		hidGetSevenSixAxisSensorStates 	(&sevenaxisstate, 1, nullptr);		
+			
+		Cursor.posX -=  sevenaxisstate.unk_x18[4] * MotionSensitivity;
+		Cursor.posY -= sevenaxisstate.unk_x18[3] * MotionSensitivity;
 		
 		// Cursor boundaries
 		if(Cursor.posX < 0) Cursor.posX = 0;
@@ -168,7 +181,29 @@ int main(int argc, char* argv[]) {
 			Text.DrawText(10, 120, 0.65f, "[X] Toggle between front/back view");
 			Text.DrawText(10, 150, 0.65f, "[B] Show/hide on-screen text");
 			Text.DrawText(10, 195, 0.65f, "Use D-pad/sticks to change values");
-			
+			Text.DrawText(700, 225, 0.65f, ("unk_x18[0]" + std::to_string(sevenaxisstate.unk_x18[0])).c_str());
+			Text.DrawText(700, 265, 0.65f, ("unk_x18[1]" + std::to_string(sevenaxisstate.unk_x18[1])).c_str());
+			Text.DrawText(700, 305, 0.65f, ("unk_x18[2]" + std::to_string(sevenaxisstate.unk_x18[2])).c_str());
+			Text.DrawText(700, 345, 0.65f, ("unk_x18[3]" + std::to_string(sevenaxisstate.unk_x18[3])).c_str());
+			Text.DrawText(700, 385, 0.65f, ("unk_x18[4]" + std::to_string(sevenaxisstate.unk_x18[4])).c_str());
+			Text.DrawText(700, 425, 0.65f, ("unk_x18[5]" + std::to_string(sevenaxisstate.unk_x18[5])).c_str());
+			Text.DrawText(700, 465, 0.65f, ("unk_x18[6]" + std::to_string(sevenaxisstate.unk_x18[6])).c_str());
+			Text.DrawText(700, 505, 0.65f, ("unk_x18[7]" + std::to_string(sevenaxisstate.unk_x18[7])).c_str());
+			Text.DrawText(700, 545, 0.65f, ("unk_x18[8]" + std::to_string(sevenaxisstate.unk_x18[8])).c_str());
+			Text.DrawText(700, 585, 0.65f, ("unk_x18[9]" + std::to_string(sevenaxisstate.unk_x18[9])).c_str());
+			if(fullController){
+							Text.DrawText(700, 10, 0.75f, "Full Controller Connected");
+			}
+			char temp_string[64];
+			sprintf(temp_string, "StartSevenSixAxis...= %X", start_seven_six_axis_sensor_result);
+			Text.DrawText(700, 50, 0.75f, temp_string);
+			sprintf(temp_string, "InitializeSevenSixAxis...= %X", initialize_seven_six_axis_sensor_result);
+			Text.DrawText(700, 90, 0.75f, temp_string);
+			float strength; 
+			sprintf(temp_string, "FusionStrength...=%X, %f", hidGetSevenSixAxisSensorFusionStrength(&strength), strength);
+			Text.DrawText(700, 130, 0.75f, temp_string);
+			sprintf(temp_string, "FusionStrengthLimit...=%X", bruteforcelol);
+			Text.DrawText(700, 170, 0.75f, temp_string);
 			for(int i = 0; i < (int)(sizeof(variableTable)/sizeof(varTable)); i++) {
 				if(varSelection == i) {
 					Text.SetColor(1.0f, 0.0f, 0.0f);
@@ -176,6 +211,7 @@ int main(int argc, char* argv[]) {
 				Text.DrawText(10, (i*30)+225, 0.65f, variableTable[i].name, *variableTable[i].var);
 				Text.SetColor(0.0f, 0.0f, 0.0f);
 			}
+			
 		}
 		
 		if(!isBehind) {
@@ -194,9 +230,12 @@ int main(int argc, char* argv[]) {
 		SwapBuffers();
 	}
 	
-	hidStopSixAxisSensor(handles[0]);
+	/*hidStopSixAxisSensor(handles[0]);
 	hidStopSixAxisSensor(handles[1]);
 	hidStopSixAxisSensor(handles[2]);
+*/
+	hidFinalizeSevenSixAxisSensor();
+	hidStopSevenSixAxisSensor();
 	
 	deinitShaders();
 	deinitEgl();
